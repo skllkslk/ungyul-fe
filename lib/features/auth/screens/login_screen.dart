@@ -72,13 +72,30 @@ class _Logo extends StatelessWidget {
   }
 }
 
-class _SocialButtons extends StatelessWidget {
+class _SocialButtons extends StatefulWidget {
   final WidgetRef ref;
   const _SocialButtons({required this.ref});
 
-  void _handleLogin(BuildContext context, String provider) {
-    ref.read(appProvider.notifier).login();
-    context.go('/birth-info');
+  @override
+  State<_SocialButtons> createState() => _SocialButtonsState();
+}
+
+class _SocialButtonsState extends State<_SocialButtons> {
+  bool _loading = false;
+
+  Future<void> _handleGoogleLogin() async {
+    setState(() => _loading = true);
+    try {
+      await widget.ref.read(appProvider.notifier).loginWithGoogle();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('로그인 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -86,20 +103,21 @@ class _SocialButtons extends StatelessWidget {
     return Column(
       children: [
         _SocialButton(
+          label: 'Google로 시작하기',
+          backgroundColor: Colors.white,
+          textColor: const Color(0xFF1F1F1F),
+          icon: 'G',
+          isText: true,
+          onTap: _loading ? null : _handleGoogleLogin,
+          loading: _loading,
+        ),
+        const SizedBox(height: 12),
+        _SocialButton(
           label: '카카오로 시작하기',
           backgroundColor: const Color(0xFFFEE500),
           textColor: const Color(0xFF191919),
           icon: '💬',
-          onTap: () => _handleLogin(context, 'kakao'),
-        ),
-        const SizedBox(height: 12),
-        _SocialButton(
-          label: '네이버로 시작하기',
-          backgroundColor: const Color(0xFF03C75A),
-          textColor: Colors.white,
-          icon: 'N',
-          isText: true,
-          onTap: () => _handleLogin(context, 'naver'),
+          onTap: null,
         ),
         const SizedBox(height: 12),
         _SocialButton(
@@ -107,15 +125,7 @@ class _SocialButtons extends StatelessWidget {
           backgroundColor: AppColors.foreground,
           textColor: AppColors.background,
           icon: '',
-          onTap: () => _handleLogin(context, 'apple'),
-        ),
-        const SizedBox(height: 12),
-        _SocialButton(
-          label: '이메일로 시작하기',
-          backgroundColor: AppColors.secondary,
-          textColor: AppColors.foreground,
-          icon: '✉',
-          onTap: () => _handleLogin(context, 'email'),
+          onTap: null,
         ),
       ],
     );
@@ -128,7 +138,8 @@ class _SocialButton extends StatelessWidget {
   final Color textColor;
   final String icon;
   final bool isText;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool loading;
 
   const _SocialButton({
     required this.label,
@@ -137,31 +148,39 @@ class _SocialButton extends StatelessWidget {
     required this.icon,
     required this.onTap,
     this.isText = false,
+    this.loading = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final disabled = onTap == null;
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor,
+          backgroundColor: disabled ? backgroundColor.withValues(alpha: 0.4) : backgroundColor,
           foregroundColor: textColor,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           elevation: 0,
         ),
         onPressed: onTap,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            isText
-                ? Text(icon, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16))
-                : Text(icon, style: const TextStyle(fontSize: 18)),
-            const SizedBox(width: 12),
-            Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 16)),
-          ],
-        ),
+        child: loading
+            ? SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2, color: textColor),
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  isText
+                      ? Text(icon, style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 16))
+                      : Text(icon, style: const TextStyle(fontSize: 18)),
+                  const SizedBox(width: 12),
+                  Text(label, style: TextStyle(color: textColor, fontWeight: FontWeight.w600, fontSize: 16)),
+                ],
+              ),
       ),
     );
   }

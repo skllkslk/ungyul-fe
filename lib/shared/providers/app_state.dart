@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../features/auth/services/auth_service.dart';
 
 class BirthInfo {
   final String name;
@@ -59,17 +60,29 @@ class AppState {
 }
 
 class AppNotifier extends StateNotifier<AppState> {
-  AppNotifier() : super(const AppState());
+  AppNotifier() : super(const AppState()) {
+    _init();
+  }
 
-  void login() => state = state.copyWith(isLoggedIn: true);
+  Future<void> _init() async {
+    final loggedIn = await AuthService.hasStoredToken();
+    if (loggedIn) state = state.copyWith(isLoggedIn: true);
+  }
 
-  void logout() => state = const AppState();
+  Future<void> loginWithGoogle() async {
+    await AuthService.googleLogin();
+    state = state.copyWith(isLoggedIn: true);
+  }
+
+  Future<void> logout() async {
+    await AuthService.logout();
+    state = const AppState();
+  }
 
   void setBirthInfo(BirthInfo info) => state = state.copyWith(birthInfo: info);
 
   void addDailyRecord(DailyRecord record) {
-    final updated = [record, ...state.dailyRecords];
-    state = state.copyWith(dailyRecords: updated);
+    state = state.copyWith(dailyRecords: [record, ...state.dailyRecords]);
   }
 }
 
