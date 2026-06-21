@@ -18,6 +18,7 @@ class _BirthInfoScreenState extends ConsumerState<BirthInfoScreen> {
   DateTime? _birthDate;
   String _birthTime = '';
   bool _lunarCalendar = false;
+  bool _submitting = false;
 
   static const _timeSlots = [
     ('23:00-01:00', '자시 (子時)', '23:00 ~ 01:00'),
@@ -59,17 +60,28 @@ class _BirthInfoScreenState extends ConsumerState<BirthInfoScreen> {
     }
   }
 
-  void _submit() {
-    final date = _birthDate!;
-    ref.read(appProvider.notifier).setBirthInfo(BirthInfo(
-          name: _name,
-          birthDate:
-              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
-          birthTime: _birthTime,
-          gender: _gender,
-          lunarCalendar: _lunarCalendar,
-        ));
-    context.go('/profile-result');
+  Future<void> _submit() async {
+    setState(() => _submitting = true);
+    try {
+      final date = _birthDate!;
+      await ref.read(appProvider.notifier).saveBirthInfo(BirthInfo(
+            name: _name,
+            birthDate:
+                '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+            birthTime: _birthTime,
+            gender: _gender,
+            lunarCalendar: _lunarCalendar,
+          ));
+      if (mounted) context.go('/profile-result');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('저장 실패: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
+    }
   }
 
   @override
@@ -87,9 +99,10 @@ class _BirthInfoScreenState extends ConsumerState<BirthInfoScreen> {
               ),
             ),
             _NextButton(
-              enabled: _canProceed,
+              enabled: _canProceed && !_submitting,
               label: _step == 4 ? '완료' : '다음',
-              onTap: _canProceed ? _onNext : null,
+              loading: _submitting,
+              onTap: (_canProceed && !_submitting) ? _onNext : null,
             ),
           ],
         ),
@@ -180,9 +193,15 @@ class _ProgressBar extends StatelessWidget {
 class _NextButton extends StatelessWidget {
   final bool enabled;
   final String label;
+  final bool loading;
   final VoidCallback? onTap;
 
-  const _NextButton({required this.enabled, required this.label, this.onTap});
+  const _NextButton({
+    required this.enabled,
+    required this.label,
+    this.loading = false,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -196,7 +215,13 @@ class _NextButton extends StatelessWidget {
             backgroundColor: enabled ? AppColors.primary : AppColors.secondary,
             foregroundColor: enabled ? Colors.white : AppColors.mutedForeground,
           ),
-          child: Text(label),
+          child: loading
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                )
+              : Text(label),
         ),
       ),
     );

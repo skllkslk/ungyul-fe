@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/network/api_client.dart';
 import '../../features/auth/services/auth_service.dart';
 
 class BirthInfo {
@@ -64,9 +66,33 @@ class AppNotifier extends StateNotifier<AppState> {
     _init();
   }
 
+  final _dio = ApiClient.create();
+
   Future<void> _init() async {
-    final loggedIn = await AuthService.hasStoredToken();
-    if (loggedIn) state = state.copyWith(isLoggedIn: true);
+    final hasToken = await AuthService.hasStoredToken();
+    if (!hasToken) return;
+
+    state = state.copyWith(isLoggedIn: true);
+
+    try {
+      final response = await _dio.get('/api/birth-profile');
+      final data = response.data as Map<String, dynamic>;
+      state = state.copyWith(
+        birthInfo: BirthInfo(
+          name: '',
+          birthDate: data['birthDate'] as String,
+          birthTime: data['birthTime'] as String? ?? 'unknown',
+          gender: data['gender'] as String,
+          lunarCalendar: data['isLunar'] as bool? ?? false,
+        ),
+      );
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 401) {
+        await AuthService.logout();
+        state = const AppState();
+      }
+      // 404 = 아직 생년월일 미등록, isLoggedIn=true birthInfo=null 유지
+    }
   }
 
   Future<void> loginWithGoogle() async {
@@ -74,12 +100,22 @@ class AppNotifier extends StateNotifier<AppState> {
     state = state.copyWith(isLoggedIn: true);
   }
 
+  Future<void> saveBirthInfo(BirthInfo info) async {
+    await _dio.post('/api/birth-profile', data: {
+      'birthDate': info.birthDate,
+      'birthTime': info.birthTime == 'unknown'
+          ? null
+          : '${info.birthTime.split('-')[0]}:00',
+      'isLunar': info.lunarCalendar,
+      'gender': info.gender,
+    });
+    state = state.copyWith(birthInfo: info);
+  }
+
   Future<void> logout() async {
     await AuthService.logout();
     state = const AppState();
   }
-
-  void setBirthInfo(BirthInfo info) => state = state.copyWith(birthInfo: info);
 
   void addDailyRecord(DailyRecord record) {
     state = state.copyWith(dailyRecords: [record, ...state.dailyRecords]);
