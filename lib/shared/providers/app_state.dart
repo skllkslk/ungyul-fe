@@ -1,7 +1,23 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/network/api_client.dart';
 import '../../features/auth/services/auth_service.dart';
+
+class SajuProfile {
+  final String dayMaster;
+  final String dayMasterDescription;
+  final String profileText;
+  final Map<String, dynamic> sajuRaw;
+
+  const SajuProfile({
+    required this.dayMaster,
+    required this.dayMasterDescription,
+    required this.profileText,
+    required this.sajuRaw,
+  });
+}
 
 class BirthInfo {
   final String name;
@@ -40,22 +56,26 @@ class DailyRecord {
 class AppState {
   final bool isLoggedIn;
   final BirthInfo? birthInfo;
+  final SajuProfile? sajuProfile;
   final List<DailyRecord> dailyRecords;
 
   const AppState({
     this.isLoggedIn = false,
     this.birthInfo,
+    this.sajuProfile,
     this.dailyRecords = const [],
   });
 
   AppState copyWith({
     bool? isLoggedIn,
     BirthInfo? birthInfo,
+    SajuProfile? sajuProfile,
     List<DailyRecord>? dailyRecords,
   }) {
     return AppState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       birthInfo: birthInfo ?? this.birthInfo,
+      sajuProfile: sajuProfile ?? this.sajuProfile,
       dailyRecords: dailyRecords ?? this.dailyRecords,
     );
   }
@@ -86,6 +106,15 @@ class AppNotifier extends StateNotifier<AppState> {
           lunarCalendar: data['isLunar'] as bool? ?? false,
         ),
       );
+
+      try {
+        final sajuResp = await _dio.get('/api/saju-profile/me');
+        state = state.copyWith(
+          sajuProfile: _parseSajuProfile(sajuResp.data as Map<String, dynamic>),
+        );
+      } on DioException {
+        // 사주 프로필 없음, 무시
+      }
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await AuthService.logout();
@@ -110,6 +139,21 @@ class AppNotifier extends StateNotifier<AppState> {
       'gender': info.gender,
     });
     state = state.copyWith(birthInfo: info);
+
+    final sajuResp = await _dio.post('/api/saju-profile/generate');
+    state = state.copyWith(
+      sajuProfile: _parseSajuProfile(sajuResp.data as Map<String, dynamic>),
+    );
+  }
+
+  SajuProfile _parseSajuProfile(Map<String, dynamic> data) {
+    final raw = jsonDecode(data['sajuRawJson'] as String) as Map<String, dynamic>;
+    return SajuProfile(
+      dayMaster: data['dayMaster'] as String,
+      dayMasterDescription: raw['dayMasterDescription'] as String? ?? '',
+      profileText: data['profileText'] as String,
+      sajuRaw: raw,
+    );
   }
 
   Future<void> logout() async {

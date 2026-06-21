@@ -8,35 +8,36 @@ import '../../../shared/widgets/app_card.dart';
 class ProfileResultScreen extends ConsumerWidget {
   const ProfileResultScreen({super.key});
 
-  static const _pillars = [
-    ('년주', AppColors.chart1),
-    ('월주', AppColors.chart2),
-    ('일주', Color(0xFF6366F1)),
-    ('시주', Color(0xFFEC4899)),
+  static const _pillarLabels = ['년주', '월주', '일주', '시주'];
+  static const _pillarColors = [
+    AppColors.chart1,
+    AppColors.chart2,
+    Color(0xFF6366F1),
+    Color(0xFFEC4899),
   ];
 
-  static const _mockHeavenly = ['甲', '丙', '戊', '庚'];
-  static const _mockEarthly = ['子', '午', '辰', '申'];
+  static const _elementMap = {
+    '갑': '목', '을': '목',
+    '병': '화', '정': '화',
+    '무': '토', '기': '토',
+    '경': '금', '신': '금',
+    '임': '수', '계': '수',
+  };
 
-  static const _personality = [
-    '강한 추진력과 창의적인 사고방식을 지니고 있습니다',
-    '감수성이 풍부하며 예술적 감각이 뛰어납니다',
-    '책임감이 강하고 맡은 일을 끝까지 완수합니다',
-  ];
-  static const _strengths = [
-    '뛰어난 리더십과 문제 해결 능력',
-    '직관적인 판단력으로 빠른 결정을 내립니다',
-    '주변 사람들에게 긍정적인 에너지를 전달합니다',
-  ];
-  static const _challenges = [
-    '완벽주의 성향으로 스트레스를 받기 쉽습니다',
-    '감정 기복을 잘 관리하는 연습이 필요합니다',
-    '타인의 의견에 귀 기울이는 자세를 기르세요',
-  ];
+  static const _elementNameMap = {
+    '갑': '목(木)', '을': '목(木)',
+    '병': '화(火)', '정': '화(火)',
+    '무': '토(土)', '기': '토(土)',
+    '경': '금(金)', '신': '금(金)',
+    '임': '수(水)', '계': '수(水)',
+  };
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final birthInfo = ref.watch(appProvider).birthInfo;
+    final state = ref.watch(appProvider);
+    final birthInfo = state.birthInfo;
+    final sajuProfile = state.sajuProfile;
+
     if (birthInfo == null) return const SizedBox.shrink();
 
     return Scaffold(
@@ -45,25 +46,27 @@ class ProfileResultScreen extends ConsumerWidget {
           children: [
             _TopBar(onDone: () => context.go('/home')),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 16),
-                    _UserHeader(birthInfo: birthInfo),
-                    const SizedBox(height: 24),
-                    _SajuPillars(),
-                    const SizedBox(height: 16),
-                    _MainElement(),
-                    const SizedBox(height: 16),
-                    _TraitSection(title: '성격 특성', items: _personality, color: AppColors.chart1, symbol: '✦'),
-                    const SizedBox(height: 16),
-                    _TraitSection(title: '타고난 강점', items: _strengths, color: AppColors.chart2, symbol: '↑'),
-                    const SizedBox(height: 16),
-                    _TraitSection(title: '성장 포인트', items: _challenges, color: const Color(0xFFEC4899), symbol: '◇'),
-                  ],
-                ),
-              ),
+              child: sajuProfile == null
+                  ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 40),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 16),
+                          _UserHeader(birthInfo: birthInfo),
+                          const SizedBox(height: 24),
+                          _SajuPillars(sajuRaw: sajuProfile.sajuRaw),
+                          const SizedBox(height: 16),
+                          _MainElement(
+                            dayMaster: sajuProfile.dayMaster,
+                            elementChar: _elementMap[sajuProfile.dayMaster] ?? '?',
+                            elementName: _elementNameMap[sajuProfile.dayMaster] ?? '',
+                          ),
+                          const SizedBox(height: 16),
+                          _DayMasterCard(description: sajuProfile.dayMasterDescription),
+                        ],
+                      ),
+                    ),
             ),
           ],
         ),
@@ -134,8 +137,18 @@ class _UserHeader extends StatelessWidget {
 }
 
 class _SajuPillars extends StatelessWidget {
+  final Map<String, dynamic> sajuRaw;
+  const _SajuPillars({required this.sajuRaw});
+
   @override
   Widget build(BuildContext context) {
+    final pillars = [
+      sajuRaw['yearPillar'] as Map<String, dynamic>,
+      sajuRaw['monthPillar'] as Map<String, dynamic>,
+      sajuRaw['dayPillar'] as Map<String, dynamic>,
+      sajuRaw['hourPillar'] as Map<String, dynamic>,
+    ];
+
     return AppCard(
       child: Column(
         children: [
@@ -145,27 +158,27 @@ class _SajuPillars extends StatelessWidget {
           const SizedBox(height: 16),
           Row(
             children: List.generate(4, (i) {
-              final pillar = ProfileResultScreen._pillars[i];
+              final cheongan = pillars[i]['cheongan'] as String;
+              final jiji = pillars[i]['jiji'] as String;
+              final color = ProfileResultScreen._pillarColors[i];
               return Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(right: i < 3 ? 12 : 0),
                   child: Column(
                     children: [
-                      Text(pillar.$1,
+                      Text(ProfileResultScreen._pillarLabels[i],
                           style: const TextStyle(color: AppColors.mutedForeground, fontSize: 12)),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         decoration: BoxDecoration(
-                          color: pillar.$2.withValues(alpha: 0.3),
+                          color: color.withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Center(
-                          child: Text(
-                            ProfileResultScreen._mockHeavenly[i],
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                          ),
+                          child: Text(cheongan,
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -176,13 +189,11 @@ class _SajuPillars extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Center(
-                          child: Text(
-                            ProfileResultScreen._mockEarthly[i],
-                            style: const TextStyle(
-                                color: AppColors.foreground,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold),
-                          ),
+                          child: Text(jiji,
+                              style: const TextStyle(
+                                  color: AppColors.foreground,
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -198,6 +209,16 @@ class _SajuPillars extends StatelessWidget {
 }
 
 class _MainElement extends StatelessWidget {
+  final String dayMaster;
+  final String elementChar;
+  final String elementName;
+
+  const _MainElement({
+    required this.dayMaster,
+    required this.elementChar,
+    required this.elementName,
+  });
+
   @override
   Widget build(BuildContext context) {
     return AppCard(
@@ -210,20 +231,22 @@ class _MainElement extends StatelessWidget {
               color: AppColors.primary.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Center(
-              child: Text('목',
-                  style: TextStyle(
+            child: Center(
+              child: Text(elementChar,
+                  style: const TextStyle(
                       color: AppColors.primary, fontSize: 24, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(width: 16),
-          const Column(
+          Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('목(木)', style: TextStyle(color: AppColors.foreground, fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 4),
-              Text('당신의 핵심 기운입니다',
-                  style: TextStyle(color: AppColors.mutedForeground, fontSize: 14)),
+              Text(elementName,
+                  style: const TextStyle(
+                      color: AppColors.foreground, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 4),
+              Text('일간 $dayMaster · 당신의 핵심 기운',
+                  style: const TextStyle(color: AppColors.mutedForeground, fontSize: 14)),
             ],
           ),
         ],
@@ -232,18 +255,9 @@ class _MainElement extends StatelessWidget {
   }
 }
 
-class _TraitSection extends StatelessWidget {
-  final String title;
-  final List<String> items;
-  final Color color;
-  final String symbol;
-
-  const _TraitSection({
-    required this.title,
-    required this.items,
-    required this.color,
-    required this.symbol,
-  });
+class _DayMasterCard extends StatelessWidget {
+  final String description;
+  const _DayMasterCard({required this.description});
 
   @override
   Widget build(BuildContext context) {
@@ -251,36 +265,13 @@ class _TraitSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(
+          const Text('일간 해석',
+              style: TextStyle(
                   color: AppColors.foreground, fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          ...items.map((item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        color: color.withValues(alpha: 0.2),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(
-                        child: Text(symbol,
-                            style: TextStyle(color: color, fontSize: 12)),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(item,
-                          style: const TextStyle(
-                              color: AppColors.foreground, fontSize: 14, height: 1.5)),
-                    ),
-                  ],
-                ),
-              )),
+          const SizedBox(height: 12),
+          Text(description,
+              style: const TextStyle(
+                  color: AppColors.foreground, fontSize: 15, height: 1.6)),
         ],
       ),
     );
