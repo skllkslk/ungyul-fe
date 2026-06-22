@@ -115,6 +115,12 @@ class AppNotifier extends StateNotifier<AppState> {
       } on DioException {
         // 사주 프로필 없음, 무시
       }
+
+      try {
+        await fetchDailyRecords();
+      } on DioException {
+        // 기록 로드 실패, 무시
+      }
     } on DioException catch (e) {
       if (e.response?.statusCode == 401) {
         await AuthService.logout();
@@ -161,8 +167,40 @@ class AppNotifier extends StateNotifier<AppState> {
     state = const AppState();
   }
 
-  void addDailyRecord(DailyRecord record) {
-    state = state.copyWith(dailyRecords: [record, ...state.dailyRecords]);
+  Future<void> addDailyRecord(DailyRecord record) async {
+    const moodLabels = ['', '우울', '별로', '보통', '좋음', '최고'];
+    final response = await _dio.post('/api/daily-reports', data: {
+      'reportDate': record.date,
+      'mood': moodLabels[record.mood],
+      'content': record.content,
+    });
+    final data = response.data as Map<String, dynamic>;
+    final saved = _parseDailyReport(data);
+    state = state.copyWith(dailyRecords: [saved, ...state.dailyRecords]);
+  }
+
+  Future<void> fetchDailyRecords() async {
+    final response = await _dio.get('/api/daily-reports');
+    final list = (response.data as List)
+        .map((e) => _parseDailyReport(e as Map<String, dynamic>))
+        .toList();
+    list.sort((a, b) => b.date.compareTo(a.date));
+    state = state.copyWith(dailyRecords: list);
+  }
+
+  static const _moodMap = {
+    '우울': 1, '별로': 2, '보통': 3, '좋음': 4, '최고': 5,
+  };
+
+  DailyRecord _parseDailyReport(Map<String, dynamic> data) {
+    return DailyRecord(
+      id: (data['id'] as num).toString(),
+      date: data['reportDate'] as String,
+      mood: _moodMap[data['mood']] ?? 3,
+      energy: 0,
+      content: data['content'] as String? ?? '',
+      tags: const [],
+    );
   }
 }
 

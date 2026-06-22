@@ -18,6 +18,7 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
   final _contentController = TextEditingController();
   final List<String> _tags = [];
   final _tagController = TextEditingController();
+  bool _saving = false;
 
   static const _moodEmojis = [
     ('😔', '우울'), ('😕', '별로'), ('😐', '보통'), ('🙂', '좋음'), ('😊', '최고'),
@@ -40,17 +41,28 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
     }
   }
 
-  void _submit() {
-    if (_contentController.text.trim().isEmpty) return;
-    ref.read(appProvider.notifier).addDailyRecord(DailyRecord(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
-          mood: _mood,
-          energy: _energy,
-          content: _contentController.text.trim(),
-          tags: List.from(_tags),
-        ));
-    context.go('/home');
+  Future<void> _submit() async {
+    if (_contentController.text.trim().isEmpty || _saving) return;
+    setState(() => _saving = true);
+    try {
+      await ref.read(appProvider.notifier).addDailyRecord(DailyRecord(
+            id: '',
+            date: DateFormat('yyyy-MM-dd').format(DateTime.now()),
+            mood: _mood,
+            energy: _energy,
+            content: _contentController.text.trim(),
+            tags: List.from(_tags),
+          ));
+      if (mounted) context.go('/home');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('저장에 실패했습니다. 다시 시도해주세요.')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
@@ -61,7 +73,8 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
           children: [
             _Header(
               onClose: () => context.go('/home'),
-              canSave: _contentController.text.trim().isNotEmpty,
+              canSave: _contentController.text.trim().isNotEmpty && !_saving,
+              saving: _saving,
               onSave: _submit,
             ),
             Padding(
@@ -106,9 +119,10 @@ class _DailyRecordScreenState extends ConsumerState<DailyRecordScreen> {
 class _Header extends StatelessWidget {
   final VoidCallback onClose;
   final bool canSave;
+  final bool saving;
   final VoidCallback onSave;
 
-  const _Header({required this.onClose, required this.canSave, required this.onSave});
+  const _Header({required this.onClose, required this.canSave, this.saving = false, required this.onSave});
 
   @override
   Widget build(BuildContext context) {
@@ -131,14 +145,18 @@ class _Header extends StatelessWidget {
           ),
           const Text('오늘의 기록',
               style: TextStyle(color: AppColors.foreground, fontSize: 17, fontWeight: FontWeight.bold)),
-          GestureDetector(
-            onTap: canSave ? onSave : null,
-            child: Text('저장',
-                style: TextStyle(
-                    color: canSave ? AppColors.primary : AppColors.mutedForeground,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16)),
-          ),
+          saving
+              ? const SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary))
+              : GestureDetector(
+                  onTap: canSave ? onSave : null,
+                  child: Text('저장',
+                      style: TextStyle(
+                          color: canSave ? AppColors.primary : AppColors.mutedForeground,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16)),
+                ),
         ],
       ),
     );
