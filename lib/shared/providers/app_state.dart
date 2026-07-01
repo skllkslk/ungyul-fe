@@ -83,10 +83,11 @@ class AppState {
 
 class AppNotifier extends StateNotifier<AppState> {
   AppNotifier() : super(const AppState()) {
+    ApiClient.instance.setLogoutCallback(_forceLogout);
     _init();
   }
 
-  final _dio = ApiClient.create();
+  final _dio = ApiClient.instance.dio;
 
   Future<void> _init() async {
     final hasToken = await AuthService.hasStoredToken();
@@ -121,13 +122,16 @@ class AppNotifier extends StateNotifier<AppState> {
       } on DioException {
         // 기록 로드 실패, 무시
       }
-    } on DioException catch (e) {
-      if (e.response?.statusCode == 401) {
-        await AuthService.logout();
-        state = const AppState();
-      }
+    } on DioException {
       // 404 = 아직 생년월일 미등록, isLoggedIn=true birthInfo=null 유지
+      // 401 = 인터셉터가 refresh 시도 후 실패 시 _forceLogout 호출
     }
+  }
+
+  // 인터셉터에서 refresh 실패 시 호출
+  void _forceLogout() {
+    AuthService.logout();
+    state = const AppState();
   }
 
   Future<void> loginWithGoogle() async {

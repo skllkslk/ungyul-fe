@@ -7,7 +7,9 @@ class AuthService {
     serverClientId:
         '996627141162-l37vqf212astp5d16t19m68q171kap1p.apps.googleusercontent.com',
   );
-  static final _dio = ApiClient.create();
+
+  // 로그인/로그아웃은 인터셉터 없는 authDio 사용
+  static final _dio = ApiClient.instance.authDio;
 
   static Future<void> googleLogin() async {
     final account = await _googleSignIn.signIn();
