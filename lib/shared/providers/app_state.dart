@@ -53,17 +53,39 @@ class DailyRecord {
   });
 }
 
+class WeeklyInsight {
+  final String id;
+  final String title;
+  final String summary;
+  final String interpretation;
+  final List<String> actionSuggestions;
+  final String periodStartDate;
+  final String periodEndDate;
+
+  const WeeklyInsight({
+    required this.id,
+    required this.title,
+    required this.summary,
+    required this.interpretation,
+    required this.actionSuggestions,
+    required this.periodStartDate,
+    required this.periodEndDate,
+  });
+}
+
 class AppState {
   final bool isLoggedIn;
   final BirthInfo? birthInfo;
   final SajuProfile? sajuProfile;
   final List<DailyRecord> dailyRecords;
+  final WeeklyInsight? weeklyInsight;
 
   const AppState({
     this.isLoggedIn = false,
     this.birthInfo,
     this.sajuProfile,
     this.dailyRecords = const [],
+    this.weeklyInsight,
   });
 
   AppState copyWith({
@@ -71,12 +93,14 @@ class AppState {
     BirthInfo? birthInfo,
     SajuProfile? sajuProfile,
     List<DailyRecord>? dailyRecords,
+    WeeklyInsight? weeklyInsight,
   }) {
     return AppState(
       isLoggedIn: isLoggedIn ?? this.isLoggedIn,
       birthInfo: birthInfo ?? this.birthInfo,
       sajuProfile: sajuProfile ?? this.sajuProfile,
       dailyRecords: dailyRecords ?? this.dailyRecords,
+      weeklyInsight: weeklyInsight ?? this.weeklyInsight,
     );
   }
 }
@@ -121,6 +145,12 @@ class AppNotifier extends StateNotifier<AppState> {
         await fetchDailyRecords();
       } on DioException {
         // 기록 로드 실패, 무시
+      }
+
+      try {
+        await fetchLatestWeeklyInsight();
+      } on DioException {
+        // 리포트 로드 실패, 무시
       }
     } on DioException {
       // 404 = 아직 생년월일 미등록, isLoggedIn=true birthInfo=null 유지
@@ -190,6 +220,40 @@ class AppNotifier extends StateNotifier<AppState> {
         .toList();
     list.sort((a, b) => b.date.compareTo(a.date));
     state = state.copyWith(dailyRecords: list);
+  }
+
+  Future<void> fetchLatestWeeklyInsight() async {
+    try {
+      final response = await _dio.get('/api/insights/weekly/latest');
+      state = state.copyWith(
+        weeklyInsight: _parseWeeklyInsight(response.data as Map<String, dynamic>),
+      );
+    } on DioException catch (e) {
+      // 404 = 아직 생성된 리포트 없음
+      if (e.response?.statusCode == 404) return;
+      rethrow;
+    }
+  }
+
+  Future<void> generateWeeklyInsight() async {
+    final response = await _dio.post('/api/insights/weekly/generate');
+    state = state.copyWith(
+      weeklyInsight: _parseWeeklyInsight(response.data as Map<String, dynamic>),
+    );
+  }
+
+  WeeklyInsight _parseWeeklyInsight(Map<String, dynamic> data) {
+    return WeeklyInsight(
+      id: (data['id'] as num).toString(),
+      title: data['title'] as String? ?? '',
+      summary: data['summary'] as String? ?? '',
+      interpretation: data['interpretation'] as String? ?? '',
+      actionSuggestions: (data['actionSuggestions'] as List? ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      periodStartDate: data['periodStartDate'] as String? ?? '',
+      periodEndDate: data['periodEndDate'] as String? ?? '',
+    );
   }
 
   static const _moodMap = {
