@@ -124,7 +124,7 @@ class AppNotifier extends StateNotifier<AppState> {
       final data = response.data as Map<String, dynamic>;
       state = state.copyWith(
         birthInfo: BirthInfo(
-          name: '',
+          name: data['name'] as String? ?? '',
           birthDate: data['birthDate'] as String,
           birthTime: data['birthTime'] as String? ?? 'unknown',
           gender: data['gender'] as String,
@@ -171,6 +171,7 @@ class AppNotifier extends StateNotifier<AppState> {
 
   Future<void> saveBirthInfo(BirthInfo info) async {
     await _dio.post('/api/birth-profile', data: {
+      'name': info.name,
       'birthDate': info.birthDate,
       'birthTime': info.birthTime == 'unknown'
           ? null
@@ -207,6 +208,8 @@ class AppNotifier extends StateNotifier<AppState> {
       'reportDate': record.date,
       'mood': moodLabels[record.mood],
       'content': record.content,
+      'energy': record.energy,
+      'tags': record.tags,
     });
     final data = response.data as Map<String, dynamic>;
     final saved = _parseDailyReport(data);
@@ -265,9 +268,10 @@ class AppNotifier extends StateNotifier<AppState> {
       id: (data['id'] as num).toString(),
       date: data['reportDate'] as String,
       mood: _moodMap[data['mood']] ?? 3,
-      energy: 0,
+      energy: data['energy'] as int? ?? 0,
       content: data['content'] as String? ?? '',
-      tags: const [],
+      tags: (data['tags'] as List?)?.map((e) => e as String).toList() ??
+          const [],
     );
   }
 }
